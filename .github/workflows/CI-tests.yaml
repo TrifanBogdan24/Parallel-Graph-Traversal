@@ -1,0 +1,40 @@
+name: Run CI Tests
+
+on:
+    push:
+        branches: main
+    pull_request:
+        branches: main
+
+jobs:
+    test:
+        runs-on: ubuntu-22.04
+
+        steps:
+          - name: Checkout repository 
+            uses: actions/checkout@v3
+        
+          - name: Install dependencies
+            run: |
+                sudo apt-get update
+                sudo apt-get install -y python3 build-essential
+        
+          - name: Compile source code
+            working-directory: ./tests
+            run: |
+                make -i SRC_PATH=../src | tee compile_info.txt
+            
+          - name: Run tests
+            working-directory: ./tests
+            run: |
+                SRC_PATH=../src python3 checker.py | tee test_results.txt
+
+          - name: Upload test logs as artifacts
+            if: always()
+            uses: actions/upload-artifact@v4
+            with:
+                name: test-results
+                retention-days: 21
+                path: |
+                    tests/compile_info.txt
+                    tests/test_results.txt

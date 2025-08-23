@@ -156,7 +156,7 @@ To run only the checker, use the `make check` command in the `tests/` directory:
 ```console
 user@so:~/.../parallel-graph/tests$ make check
 [...]
-SRC_PATH=../src python checker.py
+SRC_PATH=../src python3 checker.py
 make[1]: Entering directory '...'
 rm -f *~
 [...]
