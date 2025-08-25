@@ -4,6 +4,7 @@
 #define __OS_THREADPOOL_H__	1
 
 #include <pthread.h>
+#include <semaphore.h>
 #include "os_list.h"
 
 typedef struct {
@@ -26,7 +27,10 @@ typedef struct os_threadpool {
 	 */
 	os_list_node_t head;
 
-	/* TODO: Define threapool / queue synchronization data. */
+	/* TODO: Define threadpool / queue synchronization data. */
+	pthread_mutex_t q_lock;
+	pthread_cond_t  has_tasks;
+	int stop;            // 0 -> is running, 1 -> shutdown
 } os_threadpool_t;
 
 os_task_t *create_task(void (*f)(void *), void *arg, void (*destroy_arg)(void *));

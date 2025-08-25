@@ -5,6 +5,9 @@
 #include <assert.h>
 #include <unistd.h>
 
+#include <pthread.h>
+#include <semaphore.h>
+
 #include "os_threadpool.h"
 #include "log/log.h"
 #include "utils.h"
@@ -39,6 +42,10 @@ void enqueue_task(os_threadpool_t *tp, os_task_t *t)
 	assert(t != NULL);
 
 	/* TODO: Enqueue task to the shared task queue. Use synchronization. */
+    pthread_mutex_lock(&tp->q_lock);
+    list_add_tail(&tp->head, &t->list);
+    pthread_cond_signal(&tp->has_tasks);   // wakes up a runner
+    pthread_mutex_unlock(&tp->q_lock);
 }
 
 /*
@@ -59,10 +66,22 @@ static int queue_is_empty(os_threadpool_t *tp)
 
 os_task_t *dequeue_task(os_threadpool_t *tp)
 {
-	os_task_t *t;
-
 	/* TODO: Dequeue task from the shared task queue. Use synchronization. */
-	return NULL;
+
+	pthread_mutex_lock(&tp->q_lock);
+    while (list_empty(&tp->head) && !tp->stop)
+        pthread_cond_wait(&tp->has_tasks, &tp->q_lock);
+
+    if (tp->stop && list_empty(&tp->head)) {
+        pthread_mutex_unlock(&tp->q_lock);
+        return NULL; // iesire curata
+    }
+
+    os_list_node_t *n = tp->head.next;
+    list_del(n);
+    pthread_mutex_unlock(&tp->q_lock);
+
+    return list_entry(n, os_task_t, list);
 }
 
 /* Loop function for threads */
@@ -87,6 +106,10 @@ static void *thread_loop_function(void *arg)
 void wait_for_completion(os_threadpool_t *tp)
 {
 	/* TODO: Wait for all worker threads. Use synchronization. */
+    pthread_mutex_lock(&tp->q_lock);
+    tp->stop = 1;
+    pthread_cond_broadcast(&tp->has_tasks); // trezeste toate thread-urile
+    pthread_mutex_unlock(&tp->q_lock);
 
 	/* Join all worker threads. */
 	for (unsigned int i = 0; i < tp->num_threads; i++)
@@ -105,6 +128,11 @@ os_threadpool_t *create_threadpool(unsigned int num_threads)
 	list_init(&tp->head);
 
 	/* TODO: Initialize synchronization data. */
+	pthread_mutex_init(&tp->q_lock, NULL);
+	pthread_cond_init(&tp->has_tasks, NULL);
+	list_init(&tp->head);
+	tp->stop = 0;
+
 
 	tp->num_threads = num_threads;
 	tp->threads = malloc(num_threads * sizeof(*tp->threads));
@@ -119,7 +147,6 @@ os_threadpool_t *create_threadpool(unsigned int num_threads)
 }
 
 /* Destroy a threadpool. Assume all threads have been joined. */
-
 void destroy_threadpool(os_threadpool_t *tp)
 {
 	os_list_node_t *n, *p;
@@ -131,6 +158,9 @@ void destroy_threadpool(os_threadpool_t *tp)
 		destroy_task(list_entry(n, os_task_t, list));
 	}
 
+
+	pthread_mutex_destroy(&tp->q_lock);
+	pthread_cond_destroy(&tp->has_tasks);
 	free(tp->threads);
 	free(tp);
 }

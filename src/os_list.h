@@ -36,6 +36,7 @@ static inline void list_add_tail(os_list_node_t *head, os_list_node_t *node)
 	head->prev = node;
 }
 
+/* Delete node from list */
 static inline void list_del(os_list_node_t *node)
 {
 	node->prev->next = node->next;
