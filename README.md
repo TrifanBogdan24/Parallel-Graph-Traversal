@@ -1,4 +1,4 @@
-# Parallel Graph
+# Parallel Graph Traversal
 
 ## Objectives
 
