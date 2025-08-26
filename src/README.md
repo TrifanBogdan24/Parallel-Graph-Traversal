@@ -46,7 +46,7 @@ typedef struct os_threadpool {
     Când `stop=1`, workerii nu mai așteaptă taskuri noi și ies din bucla principală după ce coada se golește.
 
 
-Fluxul algoritmului:
+Pașii algoritmului:
   1. `enqueue_task` => inserează un task în coadă și notifică un worker
   2. Worker-ul rulează `dequeue_task` => așteaptă dacă nu sunt taskuri
   3. După ce primește un task, execută funcția (`action`), apoi îl eliberează (`destroy_task`)
@@ -78,10 +78,16 @@ Fluxul algoritmului:
 - Argumentele taskurilor (`graph_task_arg_t`) sunt **alocate dinamic pe heap**
 - Eliberarea se face exclusiv prin `destroy_task` => evită `double free`
 
-<!-- 
-## Observatii
 
+## 🔎 Observații
 
-De ce nu este o idee buna la `dequeue_task` sa pui lock pe coada
-si sa returnezi direct `NULL` daca coada este vida?
- -->
+La implementarea functiei `dequeue_task`, de ce nu este o idee bună
+sa pun lock pe coadă și să returnez direct `NULL` în cazul în care este vidă?
+
+**Răspuns**:
+- Dacă returnez NULL doar pentru că lista e momentan goală, thread-ul iese sau stă în idle loop
+- Dacă thread-ul iese => threadpool-ul moare imediat ce coada devine goală (dar poate că în câteva milisecunde vine un nou enqueue_task)
+- Dacă thread-ul reapeleza `dequeue_task()` într-un loop => intri în busy waiting (thread-urile consumă inutil CPU)
+- Problema `Producător–Consumator` spune că
+  - Consumatorii (workerii) trebuie să aștepte dacă nu e nimic de consumat.
+  - Dar așteptarea nu trebuie să fie un loop activ, ci un pthread_cond_wait sau sem_wait, adică blocantă
