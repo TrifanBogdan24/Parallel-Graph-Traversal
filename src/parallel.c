@@ -18,7 +18,7 @@ static os_graph_t *graph;
 static os_threadpool_t *tp;
 
 /* TODO: Define graph synchronization mechanisms. */
-static pthread_mutex_t graph_lock;
+static pthread_mutex_t graph_mtx;
 
 
 /* TODO: Define graph task argument. */
@@ -32,23 +32,23 @@ static void task_function(void *arg)
     graph_task_arg_t *task_arg = (graph_task_arg_t *) arg;
     unsigned int idx = task_arg->node_idx;
 
-    pthread_mutex_lock(&graph_lock);
+    pthread_mutex_lock(&graph_mtx);
     if (graph->visited[idx] != NOT_VISITED) {
-        pthread_mutex_unlock(&graph_lock);
+        pthread_mutex_unlock(&graph_mtx);
 		// Don't use free() here!
 		return;
     }
 
     graph->visited[idx] = PROCESSING;
     sum += graph->nodes[idx]->info;
-    pthread_mutex_unlock(&graph_lock);
+    pthread_mutex_unlock(&graph_mtx);
 
     for (unsigned int i = 0; i < graph->nodes[idx]->num_neighbours; i++) {
         unsigned int neigh = graph->nodes[idx]->neighbours[i];
 
-        pthread_mutex_lock(&graph_lock);
+        pthread_mutex_lock(&graph_mtx);
         int already = (graph->visited[neigh] != NOT_VISITED);
-        pthread_mutex_unlock(&graph_lock);
+        pthread_mutex_unlock(&graph_mtx);
 
         if (!already) {
             graph_task_arg_t *new_arg = malloc(sizeof(*new_arg));
@@ -60,9 +60,9 @@ static void task_function(void *arg)
         }
     }
 
-    pthread_mutex_lock(&graph_lock);
+    pthread_mutex_lock(&graph_mtx);
     graph->visited[idx] = DONE;
-    pthread_mutex_unlock(&graph_lock);
+    pthread_mutex_unlock(&graph_mtx);
 
     // Don't free(task_arg); destroy_task will handle it
 }
@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
 	graph = create_graph_from_file(input_file);
 
 	/* TODO: Initialize graph synchronization mechanisms. */
-	pthread_mutex_init(&graph_lock, NULL);
+	pthread_mutex_init(&graph_mtx, NULL);
 
 	tp = create_threadpool(NUM_THREADS);
 	process_node(0);
@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
 	destroy_threadpool(tp);
 
 	/* My TODO: Cleanup graph synchronization mechanisms. */
-	pthread_mutex_destroy(&graph_lock);
+	pthread_mutex_destroy(&graph_mtx);
 
 	printf("%d", sum);
 
